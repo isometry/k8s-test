@@ -1,0 +1,90 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: go-test-service
+  name: go-test-service
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: go-test-service
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 1
+  template:
+    metadata:
+      labels:
+        app: go-test-service
+        test-label: foo-bar-bam
+      annotations:
+        test-annotation: foo-bar-bam
+    spec:
+      containers:
+        - image: ghcr.io/isometry/k8s-test:latest
+          imagePullPolicy: Always
+          name: go-test-service
+          ports:
+            - containerPort: 8080
+              protocol: TCP
+          volumeMounts:
+            - mountPath: /etc/podinfo
+              name: podinfo
+              readOnly: true
+          resources:
+            limits:
+              cpu: 100m
+              memory: 16Mi
+            requests:
+              cpu: 100m
+              memory: 16Mi
+          env:
+            - name: BACKGROUND_COLOR
+              value: "#000"
+            - name: FOREGROUND_COLOR
+              value: "#FFF"
+      volumes:
+        - name: podinfo
+          downwardAPI:
+            items:
+              - path: name
+                fieldRef:
+                  fieldPath: metadata.name
+              - path: namespace
+                fieldRef:
+                  fieldPath: metadata.namespace
+              - path: uid
+                fieldRef:
+                  fieldPath: metadata.uid
+              - path: labels
+                fieldRef:
+                  fieldPath: metadata.labels
+              - path: annotations
+                fieldRef:
+                  fieldPath: metadata.annotations
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: go-test-service
+  name: go-test-service
+spec:
+  allocateLoadBalancerNodePorts: true
+  externalTrafficPolicy: Cluster
+  internalTrafficPolicy: Cluster
+  ipFamilies:
+    - IPv4
+  ipFamilyPolicy: SingleStack
+  ports:
+    - name: http
+      port: 8080
+      protocol: TCP
+      targetPort: 8080
+  selector:
+    app: go-test-service
+  sessionAffinity: None
+  type: LoadBalancer

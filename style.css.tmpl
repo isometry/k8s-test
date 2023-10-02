@@ -1,0 +1,19 @@
+body {
+    background-color: {{ or .background_color "#FFF" }};
+    color: {{ or .foreground_color "#000" }};
+    font-family: Firacode, Consolas, monospace;
+}
+table {
+    width: 100%;
+}
+table, tr, td {
+    border: 1px solid;
+    border-collapse: collapse;
+}
+td {
+    padding: 0.5ex 1ex;
+    whitespace: pre;
+}
+td.key {
+    text-align: right;
+}

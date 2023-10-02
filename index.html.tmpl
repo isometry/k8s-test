@@ -1,0 +1,12 @@
+<html>
+<head>
+    <title>{{ or .title "go-test-service" }}</title>
+    <link rel="stylesheet" href="/style">
+    <script src="https://unpkg.com/htmx.org@1.9.6" integrity="sha384-FhXw7b6AlE/jyjlZH5iHa/tTe9EpJ1Y55RjcgPbjeWMskSxZt1v9qkxLJWNJaGni" crossorigin="anonymous"></script>
+    <script src="https://unpkg.com/idiomorph/dist/idiomorph-ext.min.js"></script>
+    <script src="/script"></script>
+</head>
+
+<body hx-get="/data" hx-trigger="every 1s" hx-ext="morph" hx-swap="morph:innerHTML">Loading...</body>
+
+</html>

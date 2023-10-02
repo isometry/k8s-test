@@ -1,0 +1,19 @@
+var css = Array.from(document.getElementsByTagName("link")).filter(link => link.getAttribute("rel") === "stylesheet")[0];
+function reloadCSS() {
+    let href = css.href.split("?")[0];
+    css.href = href + "?id=" + new Date().getMilliseconds();
+}
+function watchElement() {
+    let newVal = document.getElementById("podname__value").textContent;
+    if (oldVal != newVal) {
+        reloadCSS();
+    }
+    oldVal = newVal;
+}
+var oldVal = "";
+window.onload = () => {
+    htmx.on("htmx:load", watchElement);
+    htmx.on("htmx:error", function(e) {
+        document.body.innerHTML = "<h1>Server Error</h1>";
+    });
+}
