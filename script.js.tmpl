@@ -1,19 +1,15 @@
-var css = Array.from(document.getElementsByTagName("link")).filter(link => link.getAttribute("rel") === "stylesheet")[0];
-function reloadCSS() {
-    let href = css.href.split("?")[0];
-    css.href = href + "?id=" + new Date().getMilliseconds();
-}
-function watchElement() {
-    let newVal = document.getElementById("podname__value").textContent;
-    if (oldVal != newVal) {
-        reloadCSS();
+function updateStyles() {
+    const styleMap = {
+        "background-color": document.getElementById("background_color__value").textContent ?? "#FFF",
+        "color": document.getElementById("foreground_color__value").textContent ?? "#000",
+    };
+    for (const [key, value] of Object.entries(styleMap)) {
+        document.body.style.setProperty(key, value);
     }
-    oldVal = newVal;
 }
-var oldVal = "";
 window.onload = () => {
-    htmx.on("htmx:load", watchElement);
-    htmx.on("htmx:error", function(e) {
+    htmx.on("htmx:load", updateStyles);
+    htmx.on("htmx:error", function (_) {
         document.body.innerHTML = "<h1>Server Error</h1>";
     });
 }

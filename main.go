@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	_ "embed"
 	"fmt"
 	"html/template"
@@ -12,6 +13,11 @@ import (
 
 	"github.com/carlmjohnson/versioninfo"
 	"github.com/gosimple/slug"
+
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
+	_ "k8s.io/client-go/plugin/pkg/client/auth"
+	"k8s.io/client-go/rest"
 )
 
 type SectionData struct {
@@ -31,7 +37,15 @@ var scriptTemplate string
 //go:embed data.html.tmpl
 var dataTemplate string
 
-func getVersioninfo() (data map[string]string) {
+func getBasicInfo() (data map[string]string) {
+	data = map[string]string{
+		"podname": os.Getenv("HOSTNAME"),
+		"podtime": time.Now().Format(time.RFC3339),
+	}
+	return
+}
+
+func getVersionInfo() (data map[string]string) {
 	data = make(map[string]string)
 
 	data["version"] = versioninfo.Version
@@ -51,7 +65,7 @@ func getEnv() (env map[string]string) {
 	return env
 }
 
-func getPodinfo(path string) (podinfo map[string]string) {
+func getPodInfo(path string) (podinfo map[string]string) {
 	var fileName, filePath string
 	podinfo = make(map[string]string)
 	if path == "" {
@@ -76,6 +90,40 @@ func getPodinfo(path string) (podinfo map[string]string) {
 	return podinfo
 }
 
+func getApiInfo() map[string]string {
+	hostname := os.Getenv("HOSTNAME")
+	namespace := os.Getenv("METADATA_NAMESPACE")
+	if os.Getenv("KUBERNETES_SERVICE_HOST") == "" || os.Getenv("KUBERNETES_SERVICE_PORT") == "" || namespace == "" {
+		return nil
+	}
+
+	appInfo := make(map[string]string)
+	config, err := rest.InClusterConfig()
+	if err != nil {
+		appInfo["error"] = fmt.Errorf("config error: %w", err).Error()
+		return appInfo
+	}
+	// creates the clientset
+	clientset, err := kubernetes.NewForConfig(config)
+	if err != nil {
+		appInfo["error"] = fmt.Errorf("clientset error: %w", err).Error()
+		return appInfo
+	}
+	pod, err := clientset.CoreV1().Pods(namespace).Get(context.TODO(), hostname, metav1.GetOptions{})
+	if err != nil {
+		appInfo["error"] = fmt.Errorf("pods error: %w", err).Error()
+		return appInfo
+	}
+	if len(pod.Spec.Containers) > 0 {
+		appInfo["spec.image"] = pod.Spec.Containers[0].Image
+	}
+	if len(pod.Status.ContainerStatuses) > 0 {
+		appInfo["status.image"] = pod.Status.ContainerStatuses[0].Image
+	}
+	appInfo["node"] = pod.Spec.NodeName
+	return appInfo
+}
+
 func templateFuncs() template.FuncMap {
 	return template.FuncMap{
 		"toSlug": func(r string) string {
@@ -90,6 +138,12 @@ func main() {
 	style := template.Must(template.New("style").Parse(styleTemplate))
 	script := template.Must(template.New("script").Parse(scriptTemplate))
 	data := template.Must(template.New("data").Funcs(templateFuncs()).Parse(dataTemplate))
+
+	http.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/plain")
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("OK"))
+	})
 
 	http.HandleFunc("/style", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/css")
@@ -115,18 +169,19 @@ func main() {
 			"sections": []SectionData{
 				{
 					Title: "Basic",
-					Data: map[string]string{
-						"podname": os.Getenv("HOSTNAME"),
-						"podtime": time.Now().Format(time.RFC3339),
-					},
+					Data:  getBasicInfo(),
 				},
 				{
 					Title: "Pod Info",
-					Data:  getPodinfo("/etc/podinfo"),
+					Data:  getPodInfo("/etc/podinfo"),
+				},
+				{
+					Title: "API Info",
+					Data:  getApiInfo(),
 				},
 				{
 					Title: "Binary Version",
-					Data:  getVersioninfo(),
+					Data:  getVersionInfo(),
 				},
 				{
 					Title: "Environment Variables",

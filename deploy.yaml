@@ -1,34 +1,55 @@
 ---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: pod-reader
+rules:
+  - apiGroups: [""] # "" indicates the core API group
+    resources: ["pods"]
+    verbs: ["get", "watch", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: pod-reader
+subjects:
+  - kind: ServiceAccount
+    name: default
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: pod-reader
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   labels:
-    app: go-test-service
-  name: go-test-service
+    app: k8s-test
+  name: k8s-test
 spec:
   replicas: 3
   selector:
     matchLabels:
-      app: go-test-service
+      app: k8s-test
   strategy:
     type: RollingUpdate
     rollingUpdate:
       maxSurge: 1
-      maxUnavailable: 1
+      maxUnavailable: 0
   template:
     metadata:
       labels:
-        app: go-test-service
-        test-label: foo-bar-bam
+        app: k8s-test
       annotations:
-        test-annotation: foo-bar-bam
+        test: foo-bar-bam
     spec:
       containers:
         - image: ghcr.io/isometry/k8s-test:latest
           imagePullPolicy: Always
-          name: go-test-service
+          name: k8s-test
           ports:
-            - containerPort: 8080
+            - name: service-port
+              containerPort: 8080
               protocol: TCP
           volumeMounts:
             - mountPath: /etc/podinfo
@@ -37,28 +58,42 @@ spec:
           resources:
             limits:
               cpu: 100m
-              memory: 16Mi
+              memory: 32Mi
             requests:
               cpu: 100m
-              memory: 16Mi
+              memory: 32Mi
           env:
+            - name: PORT
+              value: "8080"
             - name: BACKGROUND_COLOR
               value: "#000"
             - name: FOREGROUND_COLOR
               value: "#FFF"
+            - name: METADATA_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            - name: METADATA_UID
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.uid
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: service-port
+            initialDelaySeconds: 0
+            periodSeconds: 1
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: service-port
+            initialDelaySeconds: 0
+            periodSeconds: 1
+
       volumes:
         - name: podinfo
           downwardAPI:
             items:
-              - path: name
-                fieldRef:
-                  fieldPath: metadata.name
-              - path: namespace
-                fieldRef:
-                  fieldPath: metadata.namespace
-              - path: uid
-                fieldRef:
-                  fieldPath: metadata.uid
               - path: labels
                 fieldRef:
                   fieldPath: metadata.labels
@@ -70,8 +105,8 @@ apiVersion: v1
 kind: Service
 metadata:
   labels:
-    app: go-test-service
-  name: go-test-service
+    app: k8s-test
+  name: k8s-test
 spec:
   allocateLoadBalancerNodePorts: true
   externalTrafficPolicy: Cluster
@@ -85,6 +120,6 @@ spec:
       protocol: TCP
       targetPort: 8080
   selector:
-    app: go-test-service
+    app: k8s-test
   sessionAffinity: None
   type: LoadBalancer

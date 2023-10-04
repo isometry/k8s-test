@@ -1,6 +1,9 @@
-{{ define "section" }}
-{{   if .Data }}
-<div class="section" id="{{ toSlug .Title }}">
+{{- range $section := .sections }}
+{{- template "section" $section -}}
+{{- end -}}
+
+{{- define "section" }}
+{{-  if .Data }}
 <h2>{{ .Title }}</h2>
 <table>
 {{-    range $key, $value := .Data }}
@@ -12,10 +15,5 @@
 {{-      end }}
 {{-    end }}
 </table>
-</div>
 {{-  end }}
-{{ end }}
-
-{{ range $section := .sections }}
-{{ template "section" $section }}
-{{ end }}
+{{- end }}
