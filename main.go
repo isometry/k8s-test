@@ -37,10 +37,13 @@ var scriptTemplate string
 //go:embed data.html.tmpl
 var dataTemplate string
 
+var startTime time.Time
+
 func getBasicInfo() (data map[string]string) {
 	data = map[string]string{
 		"podname": os.Getenv("HOSTNAME"),
 		"podtime": time.Now().Format(time.RFC3339),
+		"runtime": time.Since(startTime).Truncate(time.Second).String(),
 	}
 	return
 }
@@ -119,6 +122,9 @@ func getApiInfo() map[string]string {
 	}
 	if len(pod.Status.ContainerStatuses) > 0 {
 		appInfo["status.image"] = pod.Status.ContainerStatuses[0].Image
+		appInfo["status.imageID"] = pod.Status.ContainerStatuses[0].ImageID
+		appInfo["restartCount"] = fmt.Sprint(pod.Status.ContainerStatuses[0].RestartCount)
+		appInfo["startTime"] = pod.Status.StartTime.Format(time.RFC3339)
 	}
 	appInfo["node"] = pod.Spec.NodeName
 	return appInfo
@@ -133,6 +139,7 @@ func templateFuncs() template.FuncMap {
 }
 
 func main() {
+	startTime = time.Now()
 
 	index := template.Must(template.New("index").Parse(indexTemplate))
 	style := template.Must(template.New("style").Parse(styleTemplate))
