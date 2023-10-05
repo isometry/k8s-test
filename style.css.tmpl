@@ -1,6 +1,10 @@
+:root {
+    --background-color: {{ or .background_color "#FFF" }};
+    --foreground-color: {{ or .foreground_color "#000" }};
+}
 body {
-    background-color: {{ or .background_color "#FFF" }};
-    color: {{ or .foreground_color "#000" }};
+    background-color: var(--background-color);
+    color: var(--foreground-color);
     font-family: Firacode, Consolas, monospace;
 }
 table {
