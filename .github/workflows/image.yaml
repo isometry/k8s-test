@@ -1,12 +1,11 @@
-name: Publish
+name: Publish Image
 
 on:
   push:
     branches: ['main']
 
 jobs:
-  publish:
-    name: Publish
+  publish-image:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/setup-go@v4
