@@ -1,14 +1,18 @@
 function updateStyles() {
+    const backgroundColorElement = document.getElementById("background_color__value");
+    const foregroundColorElement = document.getElementById("foreground_color__value");
+
     const styleMap = {
-        "--background-color": document.getElementById("background_color__value").textContent ?? "#FFF",
-        "--foreground-color": document.getElementById("foreground_color__value").textContent ?? "#000",
+        "--background-color": backgroundColorElement ? backgroundColorElement.textContent : "#FFF",
+        "--foreground-color": foregroundColorElement ? foregroundColorElement.textContent : "#000",
     };
+
     for (const [key, value] of Object.entries(styleMap)) {
         document.documentElement.style.setProperty(key, value);
     }
 }
 window.onload = () => {
-    htmx.on("htmx:load", updateStyles);
+    htmx.on("htmx:afterSwap", updateStyles);
     htmx.on("htmx:error", function (event) {
         console.error("HTMX error:", event.detail);
         const dataDiv = document.querySelector(".data");

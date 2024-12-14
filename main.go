@@ -5,6 +5,7 @@ import (
 	_ "embed"
 	"fmt"
 	"html/template"
+	"log"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -38,6 +39,36 @@ var scriptTemplate string
 var dataTemplate string
 
 var startTime time.Time
+
+type kubeconfig struct {
+	config *rest.Config
+	Client *kubernetes.Clientset
+}
+
+var kubectx *kubeconfig
+
+func init() {
+	if os.Getenv("KUBERNETES_SERVICE_HOST") == "" || os.Getenv("KUBERNETES_SERVICE_PORT") == "" {
+		return
+	}
+
+	config, err := rest.InClusterConfig()
+	if err != nil {
+		log.Printf("error loading in-cluster kubernetes config: %v", err)
+		return
+	}
+	// creates the clientset
+	clientset, err := kubernetes.NewForConfig(config)
+	if err != nil {
+		log.Printf("error loading kubernetes clientset : %v", err)
+		return
+	}
+
+	kubectx = &kubeconfig{
+		config: config,
+		Client: clientset,
+	}
+}
 
 func getBasicInfo() (data map[string]string) {
 	data = map[string]string{
@@ -96,23 +127,12 @@ func getPodInfo(path string) (podinfo map[string]string) {
 func getApiInfo() map[string]string {
 	hostname := os.Getenv("HOSTNAME")
 	namespace := os.Getenv("METADATA_NAMESPACE")
-	if os.Getenv("KUBERNETES_SERVICE_HOST") == "" || os.Getenv("KUBERNETES_SERVICE_PORT") == "" || namespace == "" {
+	if kubectx == nil || namespace == "" {
 		return nil
 	}
 
 	appInfo := make(map[string]string)
-	config, err := rest.InClusterConfig()
-	if err != nil {
-		appInfo["error"] = fmt.Errorf("config error: %w", err).Error()
-		return appInfo
-	}
-	// creates the clientset
-	clientset, err := kubernetes.NewForConfig(config)
-	if err != nil {
-		appInfo["error"] = fmt.Errorf("clientset error: %w", err).Error()
-		return appInfo
-	}
-	pod, err := clientset.CoreV1().Pods(namespace).Get(context.TODO(), hostname, metav1.GetOptions{})
+	pod, err := kubectx.Client.CoreV1().Pods(namespace).Get(context.TODO(), hostname, metav1.GetOptions{})
 	if err != nil {
 		appInfo["error"] = fmt.Errorf("pods error: %w", err).Error()
 		return appInfo
@@ -127,6 +147,40 @@ func getApiInfo() map[string]string {
 		appInfo["startTime"] = pod.Status.StartTime.Format(time.RFC3339)
 	}
 	appInfo["node"] = pod.Spec.NodeName
+	return appInfo
+}
+
+func getConfigMap(args ...string) map[string]string {
+	if kubectx == nil || len(args) < 1 || len(args) > 2 {
+		return nil
+	}
+
+	name := args[0]
+	if name == "" {
+		return nil
+	}
+
+	namespace := os.Getenv("METADATA_NAMESPACE")
+	if len(args) == 2 {
+		namespace = args[1]
+	}
+	if namespace == "" {
+		return nil
+	}
+
+	appInfo := make(map[string]string)
+	appInfo[".metadata.name"] = name
+
+	cm, err := kubectx.Client.CoreV1().ConfigMaps(namespace).Get(context.TODO(), name, metav1.GetOptions{})
+	if err != nil {
+		appInfo["error"] = fmt.Errorf("configmaps error: %w", err).Error()
+		return appInfo
+	}
+
+	for k, v := range cm.Data {
+		appInfo[k] = v
+	}
+
 	return appInfo
 }
 
@@ -181,6 +235,10 @@ func main() {
 				{
 					Title: "Pod Info",
 					Data:  getPodInfo("/etc/podinfo"),
+				},
+				{
+					Title: "ConfigMap",
+					Data:  getConfigMap(os.Getenv("CONFIGMAP_NAME"), os.Getenv("CONFIGMAP_NAMESPACE")),
 				},
 				{
 					Title: "API Info",

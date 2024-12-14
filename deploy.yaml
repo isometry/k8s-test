@@ -5,7 +5,7 @@ metadata:
   name: pod-reader
 rules:
   - apiGroups: [""] # "" indicates the core API group
-    resources: ["pods"]
+    resources: ["configmaps", "pods"]
     verbs: ["get", "watch", "list"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
@@ -27,7 +27,7 @@ metadata:
     app: k8s-test
   name: k8s-test
 spec:
-  replicas: 3
+  replicas: 1
   selector:
     matchLabels:
       app: k8s-test
