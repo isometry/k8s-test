@@ -201,7 +201,7 @@ func main() {
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/html")
 		data := map[string]any{
-			"title": "go-test-service",
+			"title": "k8s-test",
 		}
 		index.Execute(w, data)
 	})

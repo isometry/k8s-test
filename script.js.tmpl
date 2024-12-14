@@ -9,7 +9,11 @@ function updateStyles() {
 }
 window.onload = () => {
     htmx.on("htmx:load", updateStyles);
-    htmx.on("htmx:error", function (_) {
-        document.body.innerHTML = "<h1>Server Error</h1>";
+    htmx.on("htmx:error", function (event) {
+        console.error("HTMX error:", event.detail);
+        const dataDiv = document.querySelector(".data");
+        if (dataDiv) {
+            dataDiv.innerHTML = "<h1>Server Error</h1>";
+        }
     });
 }

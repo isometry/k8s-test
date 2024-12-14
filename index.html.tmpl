@@ -1,13 +1,20 @@
 <html>
 <head>
-    <title>{{ or .title "go-test-service" }}</title>
+    <title>{{ or .title "k8s-test" }}</title>
     <link rel="stylesheet" href="/style">
-    <script src="https://unpkg.com/htmx.org@1.9.6" integrity="sha384-FhXw7b6AlE/jyjlZH5iHa/tTe9EpJ1Y55RjcgPbjeWMskSxZt1v9qkxLJWNJaGni" crossorigin="anonymous"></script>
+    <script src="https://unpkg.com/htmx.org@2.0.4" integrity="sha384-HGfztofotfshcF7+8n44JQL2oJmowVChPTg48S+jvZoztPfvwD79OC/LTtG6dMp+" crossorigin="anonymous"></script>
     <script src="https://unpkg.com/idiomorph/dist/idiomorph-ext.min.js"></script>
     <script src="/script"></script>
 </head>
 
 <body>
-    <div class="data" hx-get="/data" hx-trigger="every 1s" hx-request="timeout:1s" hx-ext="morph" hx-swap="morph:innerHTML"> Loading... </div>
+    <div class="data"
+         hx-get="/data"
+         hx-trigger="every 1s"
+         hx-timeout="1s"
+         hx-ext="morph"
+         hx-swap="morph:innerHTML">
+        Loading...
+    </div>
 </body>
 </html>
