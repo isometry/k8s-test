@@ -14,6 +14,7 @@ import (
 
 	"github.com/carlmjohnson/versioninfo"
 	"github.com/gosimple/slug"
+	"github.com/spf13/viper"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
@@ -21,10 +22,12 @@ import (
 	"k8s.io/client-go/rest"
 )
 
-type SectionData struct {
+type section struct {
 	Title string
-	Data  map[string]string
+	Data  sectionData
 }
+
+type sectionData map[string]string
 
 //go:embed index.html.tmpl
 var indexTemplate string
@@ -40,15 +43,15 @@ var dataTemplate string
 
 var startTime time.Time
 
-type kubeconfig struct {
-	config *rest.Config
-	Client *kubernetes.Clientset
-}
-
-var kubectx *kubeconfig
+var kubeClient *kubernetes.Clientset
 
 func init() {
-	if os.Getenv("KUBERNETES_SERVICE_HOST") == "" || os.Getenv("KUBERNETES_SERVICE_PORT") == "" {
+	initViper()
+	initKubeClient()
+}
+
+func initKubeClient() {
+	if viper.GetString("KUBERNETES_SERVICE_HOST") == "" || viper.GetString("KUBERNETES_SERVICE_PORT") == "" {
 		return
 	}
 
@@ -64,23 +67,25 @@ func init() {
 		return
 	}
 
-	kubectx = &kubeconfig{
-		config: config,
-		Client: clientset,
-	}
+	kubeClient = clientset
 }
 
-func getBasicInfo() (data map[string]string) {
-	data = map[string]string{
-		"podname": os.Getenv("HOSTNAME"),
+func initViper() {
+	viper.SetEnvPrefix("")
+	viper.AutomaticEnv()
+}
+
+func getBasicInfo() (data sectionData) {
+	data = sectionData{
+		"podname": viper.GetString("HOSTNAME"),
 		"podtime": time.Now().Format(time.RFC3339),
 		"runtime": time.Since(startTime).Truncate(time.Second).String(),
 	}
 	return
 }
 
-func getVersionInfo() (data map[string]string) {
-	data = make(map[string]string)
+func getVersionInfo() (data sectionData) {
+	data = make(sectionData)
 
 	data["version"] = versioninfo.Version
 	data["last-commit"] = versioninfo.LastCommit.Format(time.RFC3339)
@@ -89,8 +94,8 @@ func getVersionInfo() (data map[string]string) {
 	return data
 }
 
-func getEnv() (env map[string]string) {
-	env = make(map[string]string, 1)
+func getEnv() (env sectionData) {
+	env = make(sectionData, 1)
 
 	for _, e := range os.Environ() {
 		pair := strings.SplitN(e, "=", 2)
@@ -99,9 +104,9 @@ func getEnv() (env map[string]string) {
 	return env
 }
 
-func getPodInfo(path string) (podinfo map[string]string) {
+func getPodInfo(path string) (podinfo sectionData) {
 	var fileName, filePath string
-	podinfo = make(map[string]string)
+	podinfo = make(sectionData)
 	if path == "" {
 		path = "/etc/podinfo"
 	}
@@ -124,15 +129,15 @@ func getPodInfo(path string) (podinfo map[string]string) {
 	return podinfo
 }
 
-func getApiInfo() map[string]string {
-	hostname := os.Getenv("HOSTNAME")
-	namespace := os.Getenv("METADATA_NAMESPACE")
-	if kubectx == nil || namespace == "" {
+func getApiInfo() sectionData {
+	hostname := viper.GetString("HOSTNAME")
+	namespace := viper.GetString("METADATA_NAMESPACE")
+	if kubeClient == nil || namespace == "" {
 		return nil
 	}
 
-	appInfo := make(map[string]string)
-	pod, err := kubectx.Client.CoreV1().Pods(namespace).Get(context.TODO(), hostname, metav1.GetOptions{})
+	appInfo := make(sectionData)
+	pod, err := kubeClient.CoreV1().Pods(namespace).Get(context.TODO(), hostname, metav1.GetOptions{})
 	if err != nil {
 		appInfo["error"] = fmt.Errorf("pods error: %w", err).Error()
 		return appInfo
@@ -150,38 +155,44 @@ func getApiInfo() map[string]string {
 	return appInfo
 }
 
-func getConfigMap(args ...string) map[string]string {
-	if kubectx == nil || len(args) < 1 || len(args) > 2 {
+func getConfigMaps(args []string) sectionData {
+	if kubeClient == nil || len(args) == 0 {
 		return nil
 	}
 
-	name := args[0]
-	if name == "" {
-		return nil
-	}
+	appInfo := make(sectionData, len(args))
 
-	namespace := os.Getenv("METADATA_NAMESPACE")
-	if len(args) == 2 {
-		namespace = args[1]
-	}
-	if namespace == "" {
-		return nil
-	}
+	for _, arg := range args {
+		var name string
+		namespace := viper.GetString("METADATA_NAMESPACE")
+		splitArg := strings.SplitN(arg, "/", 2)
+		switch len(splitArg) {
+		case 1:
+			name = splitArg[0]
+		case 2:
+			namespace, name = splitArg[0], splitArg[1]
+		}
+		if namespace == "" || name == "" {
+			appInfo[fmt.Sprintf(":%s", arg)] = "error: missing namespace or name"
+			continue
+		}
+		appInfo.addConfigMap(namespace, name)
 
-	appInfo := make(map[string]string)
-	appInfo[".metadata.name"] = name
-
-	cm, err := kubectx.Client.CoreV1().ConfigMaps(namespace).Get(context.TODO(), name, metav1.GetOptions{})
-	if err != nil {
-		appInfo["error"] = fmt.Errorf("configmaps error: %w", err).Error()
-		return appInfo
-	}
-
-	for k, v := range cm.Data {
-		appInfo[k] = v
 	}
 
 	return appInfo
+}
+
+func (d sectionData) addConfigMap(namespace, name string) {
+	cm, err := kubeClient.CoreV1().ConfigMaps(namespace).Get(context.TODO(), name, metav1.GetOptions{})
+	if err != nil {
+		d[fmt.Sprintf(":%s", name)] = fmt.Errorf("error loading ConfigMap: %w", err).Error()
+		return
+	}
+
+	for k, v := range cm.Data {
+		d[k] = v
+	}
 }
 
 func templateFuncs() template.FuncMap {
@@ -212,8 +223,8 @@ func main() {
 		w.Header().Set("Pragma", "no-cache")
 		w.Header().Set("Expires", "0")
 		style.Execute(w, map[string]string{
-			"background_color": os.Getenv("BACKGROUND_COLOR"),
-			"foreground_color": os.Getenv("FOREGROUND_COLOR"),
+			"background_color": viper.GetString("BACKGROUND_COLOR"),
+			"foreground_color": viper.GetString("FOREGROUND_COLOR"),
 		})
 	})
 
@@ -225,9 +236,9 @@ func main() {
 	http.HandleFunc("/data", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/html")
 		data.Execute(w, map[string]any{
-			"background_color": os.Getenv("BACKGROUND_COLOR"),
-			"foreground_color": os.Getenv("FOREGROUND_COLOR"),
-			"sections": []SectionData{
+			"background_color": viper.GetString("BACKGROUND_COLOR"),
+			"foreground_color": viper.GetString("FOREGROUND_COLOR"),
+			"sections": []section{
 				{
 					Title: "Basic",
 					Data:  getBasicInfo(),
@@ -237,8 +248,8 @@ func main() {
 					Data:  getPodInfo("/etc/podinfo"),
 				},
 				{
-					Title: "ConfigMap",
-					Data:  getConfigMap(os.Getenv("CONFIGMAP_NAME"), os.Getenv("CONFIGMAP_NAMESPACE")),
+					Title: "ConfigMap Data",
+					Data:  getConfigMaps(viper.GetStringSlice("CONFIGMAPS")),
 				},
 				{
 					Title: "API Info",
@@ -264,7 +275,7 @@ func main() {
 		index.Execute(w, data)
 	})
 
-	port := os.Getenv("PORT")
+	port := viper.GetString("PORT")
 	if port == "" {
 		port = "8080"
 	}
