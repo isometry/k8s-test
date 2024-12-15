@@ -162,7 +162,7 @@ func getConfigMaps(args []string) sectionData {
 
 	appInfo := make(sectionData, len(args))
 
-	for _, arg := range args {
+	for i, arg := range args {
 		var name string
 		namespace := viper.GetString("METADATA_NAMESPACE")
 		splitArg := strings.SplitN(arg, "/", 2)
@@ -176,17 +176,17 @@ func getConfigMaps(args []string) sectionData {
 			appInfo[fmt.Sprintf(":%s", arg)] = "error: missing namespace or name"
 			continue
 		}
-		appInfo.addConfigMap(namespace, name)
+		appInfo.addConfigMap(namespace, name, i)
 
 	}
 
 	return appInfo
 }
 
-func (d sectionData) addConfigMap(namespace, name string) {
+func (d sectionData) addConfigMap(namespace, name string, i int) {
 	cm, err := kubeClient.CoreV1().ConfigMaps(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 	if err != nil {
-		d[fmt.Sprintf(":%s", name)] = fmt.Errorf("error loading ConfigMap: %w", err).Error()
+		d[fmt.Sprintf("error:%d", i)] = err.Error()
 		return
 	}
 
