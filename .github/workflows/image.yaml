@@ -13,5 +13,7 @@ jobs:
           go-version: stable
           check-latest: true
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: ko-build/setup-ko@v0.7
       - run: ko build --bare
