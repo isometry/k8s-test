@@ -1,15 +1,15 @@
 <html>
 <head>
     <title>{{ or .title "k8s-test" }}</title>
-    <link rel="stylesheet" href="/style">
+    <link rel="stylesheet" href="style">
     <script src="https://unpkg.com/htmx.org@2.0.4" integrity="sha384-HGfztofotfshcF7+8n44JQL2oJmowVChPTg48S+jvZoztPfvwD79OC/LTtG6dMp+" crossorigin="anonymous"></script>
     <script src="https://unpkg.com/idiomorph/dist/idiomorph-ext.min.js"></script>
-    <script src="/script"></script>
+    <script src="script"></script>
 </head>
 
 <body>
     <div class="data"
-         hx-get="/data"
+         hx-get="data"
          hx-trigger="every 1s"
          hx-timeout="1s"
          hx-ext="morph"
