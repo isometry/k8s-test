@@ -2,7 +2,6 @@ name: Publish Image
 
 on:
   push:
-    branches: ["main"]
     tags: ["v*"]
 
 jobs:
@@ -17,4 +16,4 @@ jobs:
         with:
           fetch-depth: 0
       - uses: ko-build/setup-ko@v0.7
-      - run: ko build --bare
+      - run: ko build --bare --tags=latest,${GITHUB_REF#refs/tags/v}
