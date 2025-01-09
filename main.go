@@ -1,6 +1,7 @@
 package main
 
 import (
+	"cmp"
 	"context"
 	_ "embed"
 	"fmt"
@@ -215,6 +216,14 @@ func main() {
 		w.Header().Set("Content-Type", "text/plain")
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte("OK"))
+	})
+
+	http.HandleFunc("/id", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/plain")
+		w.WriteHeader(http.StatusOK)
+		namespace := cmp.Or[string](viper.GetString("METADATA_NAMESPACE"), "unknown")
+		hostname := cmp.Or[string](viper.GetString("HOSTNAME"), "unknown")
+		w.Write([]byte(fmt.Sprintf("%s/%s\n", namespace, hostname)))
 	})
 
 	http.HandleFunc("/style", func(w http.ResponseWriter, r *http.Request) {
