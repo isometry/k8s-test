@@ -7,7 +7,7 @@ toolchain go1.24.1
 require (
 	github.com/carlmjohnson/versioninfo v0.22.5
 	github.com/gosimple/slug v1.15.0
-	github.com/spf13/viper v1.20.0
+	github.com/spf13/viper v1.20.1
 	k8s.io/apimachinery v0.32.3
 	k8s.io/client-go v0.32.3
 )
