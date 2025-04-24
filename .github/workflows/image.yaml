@@ -13,5 +13,5 @@ jobs:
           go-version: stable
           check-latest: true
       - uses: actions/checkout@v4
-      - uses: ko-build/setup-ko@v0.8
+      - uses: ko-build/setup-ko@v0.9
       - run: ko build --bare --tags=latest,${GITHUB_REF#refs/tags/v}
